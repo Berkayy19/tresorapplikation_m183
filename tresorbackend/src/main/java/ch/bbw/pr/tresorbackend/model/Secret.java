@@ -4,10 +4,7 @@ import com.fasterxml.jackson.annotation.JsonRawValue;
 import jakarta.persistence.*;
 import lombok.*;
 
-/**
- * Secret
- * @author Peter Rutschmann
- */
+
 @Getter
 @Setter
 @NoArgsConstructor
@@ -16,13 +13,15 @@ import lombok.*;
 @Entity
 @Table(name = "secret")
 public class Secret {
-   @Id
-   @GeneratedValue(strategy = GenerationType.IDENTITY)
-   private Long id;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
-   @Column(nullable = false, name="user_id")
-   private Long userId;
+    @Column(nullable = false, name = "user_id")
+    private Long userId;
 
-   @Column(nullable = false, name="content")
-   private String content;
+    @Column(nullable = false, name = "content")
+    private String content;
+    @Column(nullable = false)
+    private String salt;
 }
