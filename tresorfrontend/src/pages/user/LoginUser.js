@@ -1,33 +1,38 @@
-import { useNavigate } from 'react-router-dom';
-import { useState } from "react";
+import React, { useState } from 'react';
+import { useNavigate, Link } from 'react-router-dom'; // <--- 1. Import Link
 import { postUserLogin } from "../../comunication/FetchUser";
 
 /**
  * LoginUser
- * @author Peter
+ * @author Peter Rutschmann
  */
-function LoginUser({ loginValues, setLoginValues }) {
+function LoginUser({ setLoginValues }) {
     const navigate = useNavigate();
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
     const [errorMessage, setErrorMessage] = useState('');
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        console.log("Login attempt:", loginValues);
         setErrorMessage('');
-
         try {
-            await postUserLogin(loginValues);
-            // Redirect to the login success page
+            // Call the login API
+            await postUserLogin({ email, password });
+
+            // Update global state
+            setLoginValues({ email: email, password: password });
+
+            // Redirect to home or success page
             navigate('/user/success');
         } catch (error) {
             console.error('Login failed:', error.message);
-            setErrorMessage(error.message || "Login failed. Please try again.");
+            setErrorMessage(error.message);
         }
     };
 
     return (
-        <div className="login-container">
-            <h2>Login User</h2>
+        <div>
+            <h2>Login</h2>
             <form onSubmit={handleSubmit}>
                 <section>
                     <aside>
@@ -35,38 +40,34 @@ function LoginUser({ loginValues, setLoginValues }) {
                             <label>Email:</label>
                             <input
                                 type="text"
-                                value={loginValues.email}
-                                onChange={(e) =>
-                                    setLoginValues(prev => ({ ...prev, email: e.target.value }))
-                                }
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
                                 required
-                                placeholder="Please enter your email *"
                             />
                         </div>
                         <div>
                             <label>Password:</label>
                             <input
                                 type="password"
-                                value={loginValues.password}
-                                onChange={(e) =>
-                                    setLoginValues(prev => ({ ...prev, password: e.target.value }))
-                                }
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
                                 required
-                                placeholder="Please enter your password *"
                             />
                         </div>
                     </aside>
                 </section>
 
-                {errorMessage && (
-                    <p className="error-message" style={{ color: 'red', marginTop: '10px' }}>
-                        {errorMessage}
-                    </p>
-                )}
+                <button type="submit">Login</button>
 
-                <button type="submit" className="login-button">
-                    Login
-                </button>
+                {/* --- 2. ADD THE FORGOT PASSWORD LINK HERE --- */}
+                <div style={{ marginTop: "15px", textAlign: "left" }}>
+                    <Link to="/user/forgot-password" style={{ fontSize: "0.9rem", color: "#555" }}>
+                        Forgot Password?
+                    </Link>
+                </div>
+                {/* ------------------------------------------- */}
+
+                {errorMessage && <p style={{ color: 'red' }}>{errorMessage}</p>}
             </form>
         </div>
     );

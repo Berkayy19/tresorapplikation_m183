@@ -1,6 +1,7 @@
 package ch.bbw.pr.tresorbackend.controller;
 
 import ch.bbw.pr.tresorbackend.model.*;
+import ch.bbw.pr.tresorbackend.service.CaptchaService;
 import ch.bbw.pr.tresorbackend.service.PasswordEncryptService;
 import ch.bbw.pr.tresorbackend.service.UserService;
 
@@ -17,12 +18,11 @@ import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
-/**
- * UserController
- * @author Peter Rutschmann
- */
 @RestController
 @AllArgsConstructor
 @RequestMapping("api/users")
@@ -30,40 +30,33 @@ public class UserController {
 
     private UserService userService;
     private PasswordEncryptService passwordService;
+    private CaptchaService captchaService;
     private static final Logger logger = LoggerFactory.getLogger(UserController.class);
 
-    // build create User REST API
+    // TEMPORARY STORAGE FOR TOKENS
+    private static final Map<String, String> resetTokens = new ConcurrentHashMap<>();
+
     @CrossOrigin(origins = "${CROSS_ORIGIN}")
     @PostMapping
     public ResponseEntity<String> createUser(@Valid @RequestBody RegisterUser registerUser, BindingResult bindingResult) {
-        //captcha
-        //todo add implementation
+        boolean isCaptchaValid = captchaService.verifyCaptcha(registerUser.getRecaptchaToken());
+        if (!isCaptchaValid) {
+            JsonObject obj = new JsonObject();
+            obj.addProperty("message", "Invalid Captcha. Request denied.");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new Gson().toJson(obj));
+        }
 
-        System.out.println("UserController.createUser: captcha passed.");
-
-        //input validation
         if (bindingResult.hasErrors()) {
             List<String> errors = bindingResult.getFieldErrors().stream()
                     .map(fieldError -> fieldError.getField() + ": " + fieldError.getDefaultMessage())
                     .collect(Collectors.toList());
-            System.out.println("UserController.createUser " + errors);
-
             JsonArray arr = new JsonArray();
             errors.forEach(arr::add);
             JsonObject obj = new JsonObject();
             obj.add("message", arr);
-            String json = new Gson().toJson(obj);
-
-            System.out.println("UserController.createUser, validation fails: " + json);
-            return ResponseEntity.badRequest().body(json);
+            return ResponseEntity.badRequest().body(new Gson().toJson(obj));
         }
-        System.out.println("UserController.createUser: input validation passed");
 
-        //password validation
-        //todo add implementation
-        System.out.println("UserController.createUser, password validation passed");
-
-        //transform registerUser to user
         User user = new User(
                 null,
                 registerUser.getFirstName(),
@@ -74,125 +67,78 @@ public class UserController {
 
         User savedUser = userService.createUser(user);
         JsonObject obj = new JsonObject();
-        if (savedUser != null) {
-            System.out.println("UserController.createUser, user saved in db");
-            obj.addProperty("answer", "User saved");
-        } else {
-            System.out.println("UserController.createUser, user not saved in db");
-            obj.addProperty("answer", "User not saved");
-        }
-        String json = new Gson().toJson(obj);
-        System.out.println("UserController.createUser " + json);
-        return ResponseEntity.accepted().body(json);
-    }
-
-    // build get user by id REST API
-    // http://localhost:8080/api/users/1
-    @CrossOrigin(origins = "${CROSS_ORIGIN}")
-    @GetMapping("{id}")
-    public ResponseEntity<User> getUserById(@PathVariable("id") Long userId) {
-        User user = userService.getUserById(userId);
-        if (user == null) return ResponseEntity.notFound().build();
-        return new ResponseEntity<>(user, HttpStatus.OK);
-    }
-
-    // Build Get All Users REST API
-    // http://localhost:8080/api/users
-    @CrossOrigin(origins = "${CROSS_ORIGIN}")
-    @GetMapping
-    public ResponseEntity<List<User>> getAllUsers() {
-        List<User> users = userService.getAllUsers();
-        if (users.isEmpty()) return ResponseEntity.notFound().build();
-        return new ResponseEntity<>(users, HttpStatus.OK);
-    }
-
-    // Build Update User REST API
-    // http://localhost:8080/api/users/1
-    @CrossOrigin(origins = "${CROSS_ORIGIN}")
-    @PutMapping("{id}")
-    public ResponseEntity<User> updateUser(@PathVariable("id") Long userId,
-                                           @RequestBody User user) {
-        user.setId(userId);
-        User updatedUser = userService.updateUser(user);
-        if (updatedUser == null) return ResponseEntity.notFound().build();
-        return new ResponseEntity<>(updatedUser, HttpStatus.OK);
-    }
-
-    @CrossOrigin(origins = "${CROSS_ORIGIN}")
-    @DeleteMapping("{id}")
-    public ResponseEntity<String> deleteUser(@PathVariable("id") Long userId) {
-        if( userService.deleteUser(userId))
-            return new ResponseEntity<>("User successfully deleted!", HttpStatus.OK);
-        return ResponseEntity.notFound().build();
-    }
-
-    @CrossOrigin(origins = "${CROSS_ORIGIN}")
-    @PostMapping("/byemail")
-    public ResponseEntity<String> getUserIdByEmail(@RequestBody EmailAdress email, BindingResult bindingResult) {
-        System.out.println("UserController.getUserIdByEmail: " + email);
-        if (bindingResult.hasErrors()) {
-            List<String> errors = bindingResult.getFieldErrors().stream()
-                    .map(fieldError -> fieldError.getField() + ": " + fieldError.getDefaultMessage())
-                    .collect(Collectors.toList());
-            System.out.println("UserController.createUser " + errors);
-
-            JsonArray arr = new JsonArray();
-            errors.forEach(arr::add);
-            JsonObject obj = new JsonObject();
-            obj.add("message", arr);
-            String json = new Gson().toJson(obj);
-
-            System.out.println("UserController.createUser, validation fails: " + json);
-            return ResponseEntity.badRequest().body(json);
-        }
-
-        System.out.println("UserController.getUserIdByEmail: input validation passed");
-
-        User user = userService.findByEmail(email.getEmail());
-        if (user == null) {
-            System.out.println("UserController.getUserIdByEmail, no user found with email: " + email);
-            JsonObject obj = new JsonObject();
-            obj.addProperty("message", "No user found with this email");
-            String json = new Gson().toJson(obj);
-
-            System.out.println("UserController.getUserIdByEmail, fails: " + json);
-            return ResponseEntity.badRequest().body(json);
-        }
-        System.out.println("UserController.getUserIdByEmail, user find by email");
-        JsonObject obj = new JsonObject();
-        obj.addProperty("answer", user.getId());
-        String json = new Gson().toJson(obj);
-        System.out.println("UserController.getUserIdByEmail " + json);
-        return ResponseEntity.accepted().body(json);
+        obj.addProperty("answer", savedUser != null ? "User saved" : "User not saved");
+        return ResponseEntity.accepted().body(new Gson().toJson(obj));
     }
 
     @CrossOrigin(origins = "${CROSS_ORIGIN}")
     @PostMapping("/login")
-    public ResponseEntity<LoginResponse> doLoginUser(@RequestBody LoginUser loginUser, BindingResult bindingResult) {
-        System.out.println("UserController.doLoginUser: " + loginUser);
-
-        if (bindingResult.hasErrors()) {
-            String errorMessage = bindingResult.getFieldErrors().stream()
-                    .map(fieldError -> fieldError.getField() + ": " + fieldError.getDefaultMessage())
-                    .collect(Collectors.joining("; "));
-            return ResponseEntity.badRequest().body(new LoginResponse(errorMessage, null));
-        }
-
+    public ResponseEntity<LoginResponse> doLoginUser(@RequestBody LoginUser loginUser) {
         User user = userService.findByEmail(loginUser.getEmail());
-        if (user == null) {
-            System.out.println("UserController.doLoginUser: user not found");
-            return ResponseEntity.badRequest().body(new LoginResponse("No user found with this email", null));
+        if (user != null && passwordService.doPasswordMatch(loginUser.getPassword(), user.getPassword())) {
+            return ResponseEntity.ok(new LoginResponse("Login successful", user.getId()));
         }
-
-        //ToDo: add verification for password match: loginUser.getPassword() vs user.getPassword
-        if (!passwordService.doPasswordMatch(loginUser.getPassword(), user.getPassword())) {
-            System.out.println("UserController.doLoginUser: password mismatch");
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(new LoginResponse("Invalid email or password", null));
-        }
-
-        System.out.println("UserController.doLoginUser: login successful");
-        return ResponseEntity.ok(new LoginResponse("Login successful", user.getId()));
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new LoginResponse("Invalid credentials", null));
     }
 
+    @CrossOrigin(origins = "${CROSS_ORIGIN}")
+    @PostMapping("/byemail")
+    public ResponseEntity<String> getUserIdByEmail(@RequestBody EmailAdress email) {
+        User user = userService.findByEmail(email.getEmail());
+        if(user == null) return ResponseEntity.badRequest().body("{}");
+        JsonObject obj = new JsonObject();
+        obj.addProperty("answer", user.getId());
+        return ResponseEntity.accepted().body(new Gson().toJson(obj));
+    }
+
+    // --- RESET PASSWORD LOGIC ---
+
+    @CrossOrigin(origins = "${CROSS_ORIGIN}")
+    @PostMapping("/forgot-password")
+    public ResponseEntity<String> forgotPassword(@RequestBody Map<String, String> payload) {
+        String email = payload.get("email");
+        User user = userService.findByEmail(email);
+
+        if (user != null) {
+            String token = UUID.randomUUID().toString();
+            resetTokens.put(token, email);
+
+            System.out.println("==================================================");
+            System.out.println("PASSWORD RESET LINK FOR: " + email);
+            System.out.println("http://localhost:3000/user/reset-password?token=" + token);
+            System.out.println("==================================================");
+        }
+
+        JsonObject obj = new JsonObject();
+        obj.addProperty("message", "Request processed.");
+        return ResponseEntity.ok(new Gson().toJson(obj));
+    }
+
+    @CrossOrigin(origins = "${CROSS_ORIGIN}")
+    @PostMapping("/reset-password")
+    public ResponseEntity<String> resetPassword(@RequestBody Map<String, String> payload) {
+        String token = payload.get("token");
+        String newPassword = payload.get("password");
+
+        if (!resetTokens.containsKey(token)) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Invalid or expired token.");
+        }
+
+        String email = resetTokens.get(token);
+        User user = userService.findByEmail(email);
+
+        if (user != null) {
+            String hashedPassword = passwordService.hashPassword(newPassword);
+            user.setPassword(hashedPassword);
+            userService.updateUser(user);
+
+            resetTokens.remove(token);
+
+            JsonObject obj = new JsonObject();
+            obj.addProperty("message", "Password changed.");
+            return ResponseEntity.ok(new Gson().toJson(obj));
+        }
+
+        return ResponseEntity.badRequest().body("User not found.");
+    }
 }

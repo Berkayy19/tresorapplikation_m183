@@ -8,7 +8,6 @@ import {postSecret} from "../../comunication/FetchSecrets";
  */
 function NewNote({loginValues}) {
     const initialState = {
-        kindid: 3,
         kind:"note",
         title: "",
         content: "",

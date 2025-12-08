@@ -6,18 +6,20 @@ import java.security.*;
 import java.security.spec.KeySpec;
 import java.util.Base64;
 
-
 public class EncryptUtil {
 
+    // Generates a random 16-byte salt
     public static String generateSalt() {
         byte[] salt = new byte[16];
         new SecureRandom().nextBytes(salt);
         return Base64.getEncoder().encodeToString(salt);
     }
 
+    // Derives the key using the password AND the specific salt
     public static SecretKey deriveKey(String password, String saltBase64) throws Exception {
         byte[] salt = Base64.getDecoder().decode(saltBase64);
-        KeySpec spec = new PBEKeySpec(password.toCharArray(), salt, 65536, 256); // 65536 Iterationen, 256-bit Key
+        // 65536 iterations, 256-bit Key
+        KeySpec spec = new PBEKeySpec(password.toCharArray(), salt, 65536, 256);
         SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
         byte[] keyBytes = factory.generateSecret(spec).getEncoded();
         return new SecretKeySpec(keyBytes, "AES");

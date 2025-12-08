@@ -1,14 +1,12 @@
 package ch.bbw.pr.tresorbackend.model;
 
-import com.fasterxml.jackson.annotation.JsonRawValue;
 import jakarta.persistence.*;
 import lombok.*;
-
 
 @Getter
 @Setter
 @NoArgsConstructor
-@AllArgsConstructor
+@AllArgsConstructor // This generates the constructor automatically
 @ToString
 @Entity
 @Table(name = "secret")
@@ -22,6 +20,9 @@ public class Secret {
 
     @Column(nullable = false, name = "content")
     private String content;
-    @Column(nullable = false)
+
+    @Column(name = "salt")
     private String salt;
+
+    // REMOVED: The manual constructor is gone because @AllArgsConstructor does it for you.
 }
